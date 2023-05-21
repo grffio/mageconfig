@@ -1,0 +1,4 @@
+field4: file4
+field5: 'file5'
+field6: "file6"
+invalidFormatLine

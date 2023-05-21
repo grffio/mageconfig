@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: lint
+      - task: test
+
+  lint:
+    desc: Runs golangci-lint
+    cmds:
+      - golangci-lint -v run ./...
+    sources:
+      - './**/*.go'
+      - .golangci.yml
+
+  test:
+    desc: Runs test suite
+    cmds:
+      - go test ./...
+    sources:
+      - './**/*.go'
