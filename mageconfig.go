@@ -71,13 +71,30 @@ func Load(cfg Config, file string) error {
 
 // DropArgsAfterTarget removes command-line arguments that come after the target argument (with the specified prefix).
 func DropArgsAfterTarget() {
+	// List of default mage options.
+	defaultMageOptions := []string{"-l", "-h", "-t", "-v"}
+
 	// Find the index of the first argument with the specified prefix (after target argument).
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, argPrefix) {
+			// If the argument is a default mage option, skip to the next iteration.
+			if contains(defaultMageOptions, arg) {
+				continue
+			}
 			os.Args = os.Args[:i] // Keep the target name and remove all arguments after it.
 			return
 		}
 	}
+}
+
+// contains check if a string slice contains a specific string.
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }
 
 // initializeIsSet initializes the isSet map to track which configuration parameters have been set.
