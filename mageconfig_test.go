@@ -139,6 +139,7 @@ func TestLoad(t *testing.T) {
 				assert.Equal(t, tc.wantConfig, cfg)
 			}
 
+			isLoaded = false
 			// Not pointer configuration test.
 			assert.Equal(t, Load(cfg, tc.file), errors.New("config must be a pointer to a struct"))
 

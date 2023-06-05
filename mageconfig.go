@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 // Tag constants used for struct field tags.
@@ -20,6 +21,18 @@ const (
 	argPrefix      = "-"        // The prefix used for command-line arguments.
 	sliceSeparator = ","        // The separator used for slice elements.
 	kvSeparator    = ":"        // The separator used for key-value pairs in the configuration file.
+)
+
+// List of default Mage commads and options.
+var (
+	defaultMageCommands = []string{"-l", "-h"}
+	defaultMageOptions  = []string{"-h", "-t", "-v"}
+)
+
+// Global variables to manage loading state and ensure thread safety during configuration load.
+var (
+	isLoaded bool
+	once     sync.Once
 )
 
 // ErrRequiredNotSet is the error returned when a required configuration value is not set.
@@ -40,30 +53,58 @@ func Load(cfg Config, file string) error {
 		os.Exit(0)
 	}
 
+	// If the configuration is loaded, there's nothing to do.
+	if isLoaded {
+		return nil
+	}
+
+	// Iterate over the command-line arguments and if the argument matches one of the default Mage commands,
+	// then it means that this Mage command is being passed as an argument to the Mage itself,
+	// not as an option to the Mage target.
+	for _, arg := range os.Args {
+		if strings.HasPrefix(arg, argPrefix) {
+			// In this case, we stop the execution of the Load function early to process the Mage command
+			// as a regular command-line argument, and to avoid potential errors or conflicts.
+			if contains(defaultMageCommands, arg) {
+				return nil
+			}
+		}
+	}
+
 	// Check if the passed configuration is a pointer to a struct.
 	cfgType := reflect.TypeOf(cfg)
 	if cfgType.Kind() != reflect.Pointer || cfgType.Elem().Kind() != reflect.Struct {
 		return errors.New("config must be a pointer to a struct")
 	}
 
+	// Map to keep track of which configuration parameters have been set.
 	isSet := make(map[string]*bool)
 	initializeIsSet(cfg, isSet)
 
+	// Set the default values for configuration parameters.
 	if err := setDefault(cfg); err != nil {
 		return err
 	}
 
+	// Load the configuration from a file.
 	if err := loadFromFile(cfg, file, isSet); err != nil {
 		return err
 	}
 
+	// Load the configuration from environment variables.
 	if err := loadFromEnv(cfg, isSet); err != nil {
 		return err
 	}
 
+	// Load the configuration from command-line arguments.
 	if err := loadFromArgs(cfg, isSet); err != nil {
 		return err
 	}
+
+	// Ensure that the configuration is only loaded once.
+	once.Do(func() {
+		isLoaded = true
+	})
 
 	// Check that all required fields have been set.
 	return checkRequired(cfg, isSet)
@@ -71,13 +112,32 @@ func Load(cfg Config, file string) error {
 
 // DropArgsAfterTarget removes command-line arguments that come after the target argument (with the specified prefix).
 func DropArgsAfterTarget() {
+	// If the configuration is not loaded, there's nothing to do.
+	if !isLoaded {
+		return
+	}
+
 	// Find the index of the first argument with the specified prefix (after target argument).
 	for i, arg := range os.Args {
 		if strings.HasPrefix(arg, argPrefix) {
+			// If the argument is a default mage option, skip to the next iteration.
+			if contains(defaultMageOptions, arg) {
+				continue
+			}
 			os.Args = os.Args[:i] // Keep the target name and remove all arguments after it.
 			return
 		}
 	}
+}
+
+// contains check if a string slice contains a specific string.
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }
 
 // initializeIsSet initializes the isSet map to track which configuration parameters have been set.

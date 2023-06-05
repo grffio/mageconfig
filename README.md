@@ -16,6 +16,10 @@ MageConfig is a Go library designed for flexible configuration management. It en
 
 - It's important to note that the configuration you provide to mageconfig should be a pointer to a struct or mageconfig will return an error.
 
+- When running `mage -help`, it will display the help information for `mage` itself. To view the help for a specific target in `magefile.go`, you can use the command `mage dummy -help` or invoke it after compiling it into a binary file. Also, it's worth noting that executing a command in the format `mage -v -debug --arg-name=value` will not be possible.
+
+- Additionally, please be aware that using `mage -l` to list all the build targets may currently not work due to certain complexities. When using a compiled binary, this functionality works as expected.
+
 ## Supported Tags
 
 - `file`: Defines the name of the parameter in the configuration file.
@@ -75,7 +79,7 @@ go get github.com/grffio/mageconfig
 ```
 
 ## How to Use
-An example `mage.go` is located in the `examples` directory.
+An example `magefile.go` is located in the `examples` directory.
 
 You can execute the example with the following command:
 
