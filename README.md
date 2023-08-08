@@ -1,11 +1,12 @@
 # MageConfig
 
-MageConfig is a Go library designed for flexible configuration management. It enables the loading of parameters from diverse sources including configuration files, environment variables, and command-line arguments into a designated configuration struct. This is achieved through the use of Go's struct tags, providing control over the origin and method of loading for each parameter. In addition, MageConfig offers the capability to set default values and manage required parameters effectively.
+MageConfig is a Go library designed for flexible configuration management. It allows for the loading of parameters from various sources such as configuration files, environment variables, and command-line arguments into a designated configuration struct. This is achieved with Go's struct tags, which enable control over the source and loading mechanism for each parameter. In addition, MageConfig offers the capability to set default values and manage required or dependencies parameters effectively.
 
 ## Features
 
 - **Loading Configuration**: `mageconfig` allows you to load configuration parameters from multiple sources into a configuration struct, including files, environment variables, and command-line arguments.
 - **Default Values**: You can set default values for configuration fields using the `default` tag. If a value is not provided through other sources, the default value will be used.
+- **Dependent Parameters**: Using the `depends` tag, you can specify which parameters a certain field is dependent upon. If the dependencies are not satisfied, an error will be returned.
 - **Required Parameters**: Mark configuration fields as required using the `required` tag. If a required parameter is not set, an error will be returned.
 - **Multiple Data Types**: `mageconfig` supports various data types for configuration fields, including `bool`, `int`, `[]int`, `uint`, `[]uint`, `float`, `[]float`, `string`, `[]string`, `time.Duration`, `time.Time`, and `map[string]bool|int|uint|float|string|time.Duration|time.Time`.
 - **Usage Help**: `mageconfig` provides a built-in usage help functionality that can be triggered by passing the `-help` or `--help` command-line argument.
@@ -26,6 +27,7 @@ MageConfig is a Go library designed for flexible configuration management. It en
 - `env`: Defines the name of the environment variable.
 - `arg`: Defines the name of the command-line argument.
 - `default`: Defines the default value of the parameter.
+- `depends`: Indicates a comma-separated list of parameters that the current field depends on, such as "field0,field1".
 - `required`: If set to "true", the parameter is required. If a required parameter is not set, the Load function will return an error.
 - `desc`: The description of the parameter, used for the help print.
 

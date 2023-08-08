@@ -12,12 +12,13 @@ import (
 
 // Tag constants used for struct field tags.
 const (
-	tagArg         = "arg"      // Used to define the name of the command-line argument.
-	tagEnv         = "env"      // Used to define the name of the environment variable.
-	tagFile        = "file"     // Used to define the name of the parameter in the configuration file.
-	tagDefault     = "default"  // Used to define the default value of the parameter.
-	tagDesc        = "desc"     // Used to provide a description for the parameter.
-	tagRequired    = "required" // Used to specify whether the parameter is required.
+	tagArg         = "arg"      // Defines the name of the command-line argument.
+	tagEnv         = "env"      // Defines the name of the environment variable.
+	tagFile        = "file"     // Defines the name of the parameter in the configuration file.
+	tagDefault     = "default"  // Defines the default value of the parameter.
+	tagDesc        = "desc"     // Provides a description for the parameter.
+	tagDepends     = "depends"  // Specifies other parameters that this parameter depends on.
+	tagRequired    = "required" // Specifies whether the parameter is required.
 	argPrefix      = "-"        // The prefix used for command-line arguments.
 	sliceSeparator = ","        // The separator used for slice elements.
 	kvSeparator    = ":"        // The separator used for key-value pairs in the configuration file.
@@ -31,12 +32,16 @@ var (
 
 // Global variables to manage loading state and ensure thread safety during configuration load.
 var (
-	isLoaded bool
 	once     sync.Once
+	isLoaded bool
 )
 
-// ErrRequiredNotSet is the error returned when a required configuration value is not set.
-var ErrRequiredNotSet = errors.New("required parameter not set")
+var (
+	// ErrRequiredNotSet is the error returned when a required configuration value is not set.
+	ErrRequiredNotSet = errors.New("required parameter not set")
+	// ErrDependsNotSet is the error returned when a dependent field configuration value is not set.
+	ErrDependsNotSet = errors.New("dependent parameter not set")
+)
 
 // Config is an interface that all configuration structs should implement.
 // Supported types are: bool, int, []int, uint, []uint, float, []float, string, []string,
@@ -82,7 +87,7 @@ func Load(cfg Config, file string) error {
 	initializeIsSet(cfg, isSet)
 
 	// Set the default values for configuration parameters.
-	if err := setDefault(cfg); err != nil {
+	if err := setDefault(cfg, isSet); err != nil {
 		return err
 	}
 
@@ -101,13 +106,13 @@ func Load(cfg Config, file string) error {
 		return err
 	}
 
-	// Ensure that the configuration is only loaded once.
+	// Ensure that the configuration is loaded only once.
 	once.Do(func() {
 		isLoaded = true
 	})
 
-	// Check that all required fields have been set.
-	return checkRequired(cfg, isSet)
+	// Check that all required and dependent fields in the configuration have been set.
+	return checkRequiredAndDepends(cfg, isSet)
 }
 
 // DropArgsAfterTarget removes command-line arguments that come after the target argument (with the specified prefix).
@@ -152,14 +157,19 @@ func initializeIsSet(cfg Config, isSet map[string]*bool) {
 }
 
 // setDefault sets default values for each field in a struct based on the 'tagDefault' tag.
-func setDefault(cfg Config) error {
+func setDefault(cfg Config, isSet map[string]*bool) error {
 	return setFields(cfg, func(field reflect.StructField, value reflect.Value) error {
 		defaultValue := field.Tag.Get(tagDefault)
 		if defaultValue == "" {
 			return nil
 		}
 
-		return setFieldByKind(field, value, defaultValue)
+		if err := setFieldByKind(field, value, defaultValue); err != nil {
+			return err
+		}
+		*isSet[field.Name] = true
+
+		return nil
 	})
 }
 
@@ -292,17 +302,31 @@ func getArgValue(argName string, isBool bool) string {
 	return ""
 }
 
-// checkRequired verifies if all required configuration parameters have been set. If not, it returns
-// an error indicating which required parameter is missing.
-func checkRequired(cfg Config, isSet map[string]*bool) error {
+// checkRequiredAndDepends verifies if all required and dependent configuration parameters have been set.
+// If a parameter marked 'required' is not set, or
+// if a parameter with a 'depends' tag doesn't have its dependencies met,
+// it returns an error indicating which parameter is missing.
+func checkRequiredAndDepends(cfg Config, isSet map[string]*bool) error {
 	cfgType := reflect.TypeOf(cfg).Elem()
 
 	for i := 0; i < cfgType.NumField(); i++ {
 		field := cfgType.Field(i)
 
 		required := field.Tag.Get(tagRequired)
+		// If the field is marked as 'required' and not set in the 'isSet' map, return an error.
 		if required == "true" && (isSet[field.Name] == nil || !*isSet[field.Name]) {
 			return fmt.Errorf("%w: %s", ErrRequiredNotSet, field.Name)
+		}
+
+		dependsStr := field.Tag.Get(tagDepends)
+		if dependsStr != "" {
+			depends := strings.Split(dependsStr, ",")
+			for _, depend := range depends {
+				// If the dependent field is not set in the 'isSet' map, return an error.
+				if isSet[depend] == nil || !*isSet[depend] {
+					return fmt.Errorf("%w: %s", ErrDependsNotSet, depend)
+				}
+			}
 		}
 	}
 

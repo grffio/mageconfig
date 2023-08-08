@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 )
 
 // isHelpRequested checks if the help flag (-help or --help) was provided in the command-line arguments.
@@ -42,6 +43,7 @@ func printUsage(cfgType reflect.Type) {
 		defaultValue := field.Tag.Get(tagDefault)
 		description := field.Tag.Get(tagDesc)
 		required := field.Tag.Get(tagRequired)
+		dependsStr := field.Tag.Get(tagDepends)
 
 		// Define a placeholder for unused fields.
 		const notUsedStr = "<NOTUSED>"
@@ -77,6 +79,9 @@ func printUsage(cfgType reflect.Type) {
 		}
 		if required == "true" {
 			fmt.Fprintf(flag.CommandLine.Output(), "    required:    true\n")
+		}
+		if dependsStr != "" {
+			fmt.Fprintf(flag.CommandLine.Output(), "     depends:     %s\n", strings.Split(dependsStr, ","))
 		}
 		fmt.Fprintf(flag.CommandLine.Output(), "\n")
 	}
